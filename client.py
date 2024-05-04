@@ -1,25 +1,28 @@
-import sys
 import socket
-import selectors
-import types
 
-sel = selectors.DefaultSelector()
-messages = [b"Message 1 from client.", b"Message 2 from client."]
 
-def start_connections(host, port, num_conns):
-    server_addr = (host, port)
-    for i in range(0, num_conns):
-        connid = i + 1
-        print(f"Starting connection {connid} to {server_addr}")
-        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        sock.setblocking(False)
-        sock.connect_ex(server_addr)
-        events = selectors.EVENT_READ | selectors.EVENT_WRITE
-        data = types.SimpleNamespace(
-            connid=connid,
-            msg_total=sum(len(m) for m in messages),
-            recv_total=0,
-            messages=messages.copy(),
-            outb=b"",
-        )
-        sel.register(sock, events, data=data)
+def start_client(host, port):
+    client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    client_socket.connect((host, port))
+
+    # message = "SET myKey myValue"
+    messages = [
+        "SET myKey myValue",
+        "GET myKey",
+        "DELETE myKey",
+        "EXISTS myKey",
+        "KEYS myKey",
+    ]
+
+    for message in messages:
+        client_socket.sendall(message.encode())
+        response = client_socket.recv(1024)  # max of 1024
+        print("Received from server: ",  response.decode())
+
+    # client_socket.close()
+
+
+HOST = "127.0.0.1"
+PORT = 65432
+
+start_client(HOST, PORT)

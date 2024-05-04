@@ -1,58 +1,85 @@
-import sys
 import socket
-import selectors
-import types
+import threading
+
+
+class KeyValueServer:
+    def __init__(self, host, port):
+        self.host = host
+        self.port = port
+        self.data = {}
+        self.server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.server_socket.bind((self.host, self.port))
+
+    def handle_client(self, client_socket, address):
+        print(f"Handling connection from {address}")
+        while True:
+            data = client_socket.recv(1024)
+            if not data:
+                break
+
+            print(f"Received from {address}: {data.decode()}")
+            # decode, endoce bytes to string
+
+            command, key, value = self.parse_request(data.decode())
+            if command == "SET":
+                if key and value:
+                    self.data[key] = value # what if data already exists
+                    response = "OK"
+                else:
+                    response = "Bad request"
+            elif command == "GET":
+                response = self.data.get(key, "Key not found")
+            elif command == "DELETE":
+                if key in self.data:
+                    del self.data[key]
+                    response = "OK"
+                else:
+                    response = "Key not found"
+            elif command == "EXISTS":
+                response = "True" if key in self.data else "False"
+            elif command == "KEYS":
+                response = ", ".join(self.data.keys())
+            else:
+                response = "Unknown command"
+
+            client_socket.sendall(response.encode())
+
+        # Uncomment for request-response model
+        # print(f"Connection from {address} closed") 
+        # client_socket.close()
+
+    def parse_request(self, message):
+        parts = message.split(' ')
+        command = parts[0]
+        key = parts[1] if len(parts) > 1 else None
+        value = parts[2] if len(parts) > 2 else None
+
+        return command, key, value
+
+
+    def listen(self):
+        self.server_socket.listen()
+        print(f"listening on {self.host}:{self.port}")
+        while True:
+            client_socket, address = self.server_socket.accept()
+            client_thread = threading.Thread(target=self.handle_client, args=(client_socket, address))
+            client_thread.start()
+
+
+    # def handle client request
+    # process request
+    # client response 
+
+    def start(self):
+        try:
+            self.listen()
+        finally:
+            self.server_socket.close()
+
 
 
 HOST = "127.0.0.1" 
 PORT = 65432 
 
-sel = selectors.DefaultSelector()
-
-host, port = sys.argv[1], int(sys.argv[2])
-lsock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-lsock.bind((host, port))
-lsock.listen()
-print(f"Listening on {(host, port)}")
-lsock.setblocking(False)
-sel.register(lsock, selectors.EVENT_READ, data=None)
-
-
-def accept_wrapper(sock):
-    conn, addr = sock.accept()  # Should be ready to read
-    print(f"Accepted connection from {addr}")
-    conn.setblocking(False)
-    data = types.SimpleNamespace(addr=addr, inb=b"", outb=b"")
-    events = selectors.EVENT_READ | selectors.EVENT_WRITE
-    sel.register(conn, events, data=data)
-
-def service_connection(key, mask):
-    sock = key.fileobj
-    data = key.data
-    if mask & selectors.EVENT_READ:
-        recv_data = sock.recv(1024)  # Should be ready to read
-        if recv_data:
-            data.outb += recv_data
-        else:
-            print(f"Closing connection to {data.addr}")
-            sel.unregister(sock)
-            sock.close()
-    if mask & selectors.EVENT_WRITE:
-        if data.outb:
-            print(f"Echoing {data.outb!r} to {data.addr}")
-            sent = sock.send(data.outb)  # Should be ready to write
-            data.outb = data.outb[sent:]
-
-
-try:
-    while True:
-        events = sel.select(timeout=None)
-        for key, mask in events:
-            if key.data is None:
-                accept_wrapper(key.fileobj)
-            else:
-                service_connection(key, mask)
-except KeyboardInterrupt:
-    print("Caught keyboard interrupt, exiting")
-finally:
-    sel.close()
+server = KeyValueServer(HOST, PORT)
+server.start()
