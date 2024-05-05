@@ -7,13 +7,18 @@ def start_client(client_id, host, port):
 
     messages = [
         "BEGIN",
-        "SET key{0} value{0}".format(client_id),
+        "SET key{0} {0}".format(client_id),
+        "GET key{0}".format(client_id),
+        "INCR key2{0}".format(client_id),
+        "GET key{0}".format(client_id),
+        "DECR key2{0}".format(client_id),
         "GET key{0}".format(client_id),
         "COMMIT",
         "EXISTS key{0}".format(client_id),
         "KEYS",
     ]
 
+    
     for message in messages:
         client_socket.sendall(message.encode())
         response = client_socket.recv(1024)  # max of 1024
@@ -26,7 +31,7 @@ HOST = "127.0.0.1"
 PORT = 65432
 
 client_threads = []
-for i in range(10):  
+for i in range(3):  
     client_thread = threading.Thread(target=start_client, args=(i, HOST, PORT))
     client_threads.append(client_thread)
     client_thread.start()

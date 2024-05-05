@@ -37,10 +37,16 @@ class KeyValueServer:
                 response = self.handle_delete(key)
             elif command == "KEYS":
                 response = self.handle_keys()
+            elif command == "INCR":
+                response = self.handle_incr(key)
+            elif command == "DECR":
+                response = self.handle_decr(key)
             else:
                 response = "Unknown command"
 
             client_socket.sendall(response.encode())
+
+            self.save_data()
 
     def handle_set(self, key, value):
         self.lock.writer_lock.acquire()
@@ -97,6 +103,30 @@ class KeyValueServer:
             return ", ".join(self.data.keys())
         finally:
             self.lock.reader_lock.release()
+
+    def handle_incr(self, key):
+        self.lock.writer_lock.acquire()
+        try:
+            value, expiration_time = self.data.get(key, (0, None))
+            if not isinstance(value, int):
+                return "Value is not an integer"
+            value += 1
+            self.data[key] = (value, expiration_time)
+            return str(value)
+        finally:
+            self.lock.writer_lock.release()
+    
+    def handle_decr(self, key):
+        self.lock.writer_lock.acquire()  
+        try:
+            value, expiration_time = self.data.get(key, (0, None))
+            if not isinstance(value, int):
+                return "Value is not an integer"
+            value -= 1
+            self.data[key] = (value, expiration_time)
+            return str(value)
+        finally:
+            self.lock.writer_lock.release() 
 
     def parse_request(self, message):
         parts = message.split(" ")
