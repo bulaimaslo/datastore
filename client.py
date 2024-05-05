@@ -6,9 +6,10 @@ def start_client(client_id, host, port):
     client_socket.connect((host, port))
 
     messages = [
+        "BEGIN",
         "SET key{0} value{0}".format(client_id),
         "GET key{0}".format(client_id),
-        "DELETE key{0}".format(client_id),
+        "COMMIT",
         "EXISTS key{0}".format(client_id),
         "KEYS",
     ]
