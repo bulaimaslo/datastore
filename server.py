@@ -2,6 +2,7 @@ import socket
 import threading
 import json
 import os
+from rwlock import RWLock
 
 
 class KeyValueServer:
@@ -9,6 +10,7 @@ class KeyValueServer:
         self.host = host
         self.port = port
         self.filename = filename
+        self.lock = RWLock()
         self.data = {}
         self.load_data()
         self.server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -22,36 +24,55 @@ class KeyValueServer:
                 break
 
             print(f"Received from {address}: {data.decode()}")
-            # decode, endoce bytes to string
 
             command, key, value = self.parse_request(data.decode())
             if command == "SET":
-                if key and value:
-                    self.data[key] = value # what if data already exists
-                    response = "OK"
-                else:
-                    response = "Bad request"
+                self.lock.writer_lock.acquire() 
+                try:
+                    if key and value:
+                        self.data[key] = value
+                        response = "OK"
+                    else:
+                        response = "Bad request"
+                finally:
+                    self.lock.writer_lock.release()  
             elif command == "GET":
-                response = self.data.get(key, "Key not found")
+                self.lock.reader_lock.acquire()  
+                try:
+                    response = self.data.get(key, "Key not found")
+                finally:
+                    self.lock.reader_lock.release()
             elif command == "DELETE":
-                if key in self.data:
-                    del self.data[key]
-                    response = "OK"
-                else:
-                    response = "Key not found"
+                self.lock.writer_lock.acquire()  
+                try:
+                    if key in self.data:
+                        del self.data[key]
+                        response = "OK"
+                    else:
+                        response = "Key not found"
+                finally:
+                    self.lock.writer_lock.release() 
             elif command == "EXISTS":
-                response = "True" if key in self.data else "False"
+                self.lock.reader_lock.acquire() 
+                try:
+                    response = "True" if key in self.data else "False"
+                finally:
+                    self.lock.reader_lock.release() 
             elif command == "KEYS":
-                response = ", ".join(self.data.keys())
+                self.lock.reader_lock.acquire()  
+                try:
+                    response = ", ".join(self.data.keys())
+                finally:
+                    self.lock.reader_lock.release()
             else:
                 response = "Unknown command"
 
             client_socket.sendall(response.encode())
-            self.save_data()
-
-        # Uncomment for request-response model
-        # print(f"Connection from {address} closed") 
-        # client_socket.close()
+            # self.save_data()
+            
+            # Uncomment for request-response model
+            # print(f"Connection from {address} closed") 
+            # client_socket.close()
 
     def parse_request(self, message):
         parts = message.split(' ')

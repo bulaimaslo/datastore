@@ -1,20 +1,15 @@
 import socket
+import threading
 
-
-def start_client(host, port):
+def start_client(client_id, host, port):
     client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     client_socket.connect((host, port))
 
-
-    # messages = [
-    #     "SET key{0} value{0}".format(i) for i in range(50)
-    # ]
-
     messages = [
-        "SET myKey myValue",
-        "GET myKey",
-        "DELETE myKey",
-        "EXISTS myKey",
+        "SET key{0} value{0}".format(client_id),
+        "GET key{0}".format(client_id),
+        "DELETE key{0}".format(client_id),
+        "EXISTS key{0}".format(client_id),
         "KEYS",
     ]
 
@@ -29,4 +24,11 @@ def start_client(host, port):
 HOST = "127.0.0.1"
 PORT = 65432
 
-start_client(HOST, PORT)
+client_threads = []
+for i in range(10):  
+    client_thread = threading.Thread(target=start_client, args=(i, HOST, PORT))
+    client_threads.append(client_thread)
+    client_thread.start()
+
+for client_thread in client_threads:
+    client_thread.join()
