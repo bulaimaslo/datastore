@@ -1,12 +1,16 @@
 import socket
 import threading
+import json
+import os
 
 
 class KeyValueServer:
-    def __init__(self, host, port):
+    def __init__(self, host, port, filename='data.json'):
         self.host = host
         self.port = port
+        self.filename = filename
         self.data = {}
+        self.load_data()
         self.server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.server_socket.bind((self.host, self.port))
 
@@ -43,6 +47,7 @@ class KeyValueServer:
                 response = "Unknown command"
 
             client_socket.sendall(response.encode())
+            self.save_data()
 
         # Uncomment for request-response model
         # print(f"Connection from {address} closed") 
@@ -56,6 +61,14 @@ class KeyValueServer:
 
         return command, key, value
 
+    def save_data(self):
+        with open(self.filename, 'w') as f:
+            json.dump(self.data, f)
+    
+    def load_data(self):
+        if os.path.exists(self.filename):
+            with open(self.filename, 'r') as f:
+                self.data = json.load(f)
 
     def listen(self):
         self.server_socket.listen()
@@ -65,10 +78,6 @@ class KeyValueServer:
             client_thread = threading.Thread(target=self.handle_client, args=(client_socket, address))
             client_thread.start()
 
-
-    # def handle client request
-    # process request
-    # client response 
 
     def start(self):
         try:
