@@ -6,6 +6,7 @@ def start_client(client_id, host, port):
     client_socket.connect((host, port))
 
     messages = [
+        "SUBSCRIBE",
         "BEGIN",
         "SET key{0} {0}".format(client_id),
         "GET key{0}".format(client_id),
@@ -16,13 +17,16 @@ def start_client(client_id, host, port):
         "COMMIT",
         "EXISTS key{0}".format(client_id),
         "KEYS",
+        "END",
     ]
 
-    
     for message in messages:
         client_socket.sendall(message.encode())
-        response = client_socket.recv(1024)  # max of 1024
-        print("Received from server: ",  response.decode())
+        while True:
+            response = client_socket.recv(1024)  # max of 1024
+            print("Received from server: ",  response.decode())
+            if response.decode() == "END":
+                break
 
     client_socket.close()
 

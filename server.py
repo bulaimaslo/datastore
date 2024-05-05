@@ -14,6 +14,7 @@ class KeyValueServer:
         self.lock = RWLock()
         self.data = {}
         self.transaction_data = None
+        self.subscribers = []
         self.load_data()
         self.server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.server_socket.bind((self.host, self.port))
@@ -41,6 +42,10 @@ class KeyValueServer:
                 response = self.handle_incr(key)
             elif command == "DECR":
                 response = self.handle_decr(key)
+            elif command == "SUBSCRIBE":
+                response = self.handle_subscribe(client_socket)
+            elif command == "UNSUBSCRIBE":
+                response = self.handle_unsubscribe(client_socket)
             else:
                 response = "Unknown command"
 
@@ -54,6 +59,7 @@ class KeyValueServer:
             if key and value:
                 expiration_time = time.time() + 24 * 60 * 60
                 self.data[key] = (value, expiration_time)
+                self.notify_subscribers(f"Notification set {key} {value}")
                 return "OK"
             else:
                 return "Bad request"
@@ -91,6 +97,7 @@ class KeyValueServer:
         try:
             if key in self.data:
                 del self.data[key]
+                self.notify_subscribers(f"Notification del {key}")
                 return "OK"
             else:
                 return "Key not found"
@@ -126,7 +133,17 @@ class KeyValueServer:
             self.data[key] = (value, expiration_time)
             return str(value)
         finally:
-            self.lock.writer_lock.release() 
+            self.lock.writer_lock.release()
+        
+    def handle_subscribe(self, client_socket):
+        if client_socket not in self.subscribers:
+            self.subscribers.append(client_socket)
+        return "Subscribed to updates"
+
+    def handle_unsubscribe(self, client_socket):
+        if client_socket in self.subscribers:
+            self.subscribers.remove(client_socket)
+        return "Unsubscribed from updates"
 
     def parse_request(self, message):
         parts = message.split(" ")
